@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PPL Tracker">
+<title>PPL Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --push:#C0392B;--push-l:#FDEDEC;--push-m:#F5C4B3;--push-d:#922B21;
+  --pull:#1A5276;--pull-l:#EAF2FF;--pull-m:#AED6F1;--pull-d:#154360;
+  --legs:#1E8449;--legs-l:#EAFAF1;--legs-m:#A9DFBF;--legs-d:#196F3D;
+  --dark:#0D1117;--card:#161B22;--border:#30363D;
+  --text:#E6EDF3;--muted:#8B949E;--bg:#010409;
+  --mob-bg:#1A1433;--mob-border:#6E40C9;--mob-text:#C3B1E1;
+  --radius:14px;--radius-sm:9px;--radius-xs:6px;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;flex-direction:column;max-width:430px;margin:0 auto;position:relative}
+
+/* STATUS BAR */
+.statusbar{height:44px;background:var(--dark);flex-shrink:0;display:flex;align-items:flex-end;padding:0 20px 8px;justify-content:space-between}
+.statusbar-title{font-size:13px;font-weight:600;letter-spacing:0.3px;color:var(--text)}
+.statusbar-sync{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--legs);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.sync-dot.saving{background:#F39C12;animation:pulse 0.5s infinite}
+.sync-dot.error{background:var(--push);animation:none}
+
+/* MAIN SCROLL AREA */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:80px}
+.main::-webkit-scrollbar{display:none}
+
+/* TAB BAR */
+.tabbar{height:72px;background:var(--dark);border-top:1px solid var(--border);display:flex;align-items:flex-start;padding:10px 4px 0;flex-shrink:0;position:relative;z-index:50}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:4px 2px;border:none;background:none;-webkit-tap-highlight-color:transparent;transition:opacity 0.15s}
+.tab-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:-0.5px;color:white;transition:transform 0.2s,box-shadow 0.2s}
+.tab-icon.home{background:var(--card);border:1px solid var(--border);font-size:16px}
+.tab-icon.push{background:var(--push)}
+.tab-icon.pull{background:var(--pull)}
+.tab-icon.legs{background:var(--legs)}
+.tab.active .tab-icon{transform:scale(1.1)}
+.tab.active .tab-icon.push{box-shadow:0 0 12px rgba(192,57,43,0.5)}
+.tab.active .tab-icon.pull{box-shadow:0 0 12px rgba(26,82,118,0.5)}
+.tab.active .tab-icon.legs{box-shadow:0 0 12px rgba(30,132,73,0.5)}
+.tab-lbl{font-size:10px;font-weight:500;color:var(--muted);font-family:var(--font)}
+.tab.active .tab-lbl{color:var(--text);font-weight:600}
+
+/* PAGES */
+.page{display:none;padding:0}
+.page.active{display:block}
+
+/* DAY HEADER */
+.day-header{margin:12px 12px 10px;border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden}
+.day-header::before{content:'';position:absolute;top:-20px;right:-20px;width:100px;height:100px;border-radius:50%;opacity:0.15;background:white}
+.day-header.push{background:linear-gradient(135deg,var(--push-d),var(--push))}
+.day-header.pull{background:linear-gradient(135deg,var(--pull-d),var(--pull))}
+.day-header.legs{background:linear-gradient(135deg,var(--legs-d),var(--legs))}
+.day-header h2{font-size:20px;font-weight:600;color:white;letter-spacing:-0.3px}
+.day-header p{font-size:12px;color:rgba(255,255,255,0.65);margin-top:3px}
+
+/* WARMUP */
+.warmup{margin:0 12px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px}
+.section-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px}
+.warmup-step{font-size:12px;color:var(--text);padding:3px 0;display:flex;gap:8px;line-height:1.4}
+.warmup-step::before{content:'→';color:var(--muted);flex-shrink:0}
+
+/* EXERCISE CARD */
+.ex-card{margin:0 12px 8px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.2s}
+.ex-card.mob{border-color:var(--mob-border);background:var(--mob-bg)}
+.ex-top{padding:13px 14px 8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.ex-name{font-size:14px;font-weight:500;color:var(--text);line-height:1.35;flex:1}
+.ex-badge{font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0;font-family:var(--mono)}
+.ex-badge.push{background:rgba(192,57,43,0.2);color:#F1948A;border:1px solid rgba(192,57,43,0.3)}
+.ex-badge.pull{background:rgba(26,82,118,0.2);color:#85C1E9;border:1px solid rgba(26,82,118,0.3)}
+.ex-badge.legs{background:rgba(30,132,73,0.2);color:#82E0AA;border:1px solid rgba(30,132,73,0.3)}
+.ex-badge.mob{background:rgba(110,64,201,0.2);color:var(--mob-text);border:1px solid rgba(110,64,201,0.3)}
+.ex-meta{padding:0 14px 10px;display:flex;gap:6px;flex-wrap:wrap}
+.meta-tag{background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:var(--radius-xs);padding:3px 9px;font-size:11px;color:var(--muted)}
+.meta-tag b{color:var(--text);font-weight:500}
+
+/* SESSION LOG */
+.log-lbl{padding:0 14px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.log-scroll{overflow-x:auto;padding:0 14px 13px;-webkit-overflow-scrolling:touch}
+.log-scroll::-webkit-scrollbar{display:none}
+.sessions{display:flex;gap:6px;min-width:max-content}
+.sess-col{display:flex;flex-direction:column;gap:4px;width:86px}
+.sess-new-lbl{font-size:9px;font-weight:700;text-align:center;border-radius:4px;padding:2px 0;letter-spacing:0.5px;color:white}
+.sess-new-lbl.push{background:var(--push)}.sess-new-lbl.pull{background:var(--pull)}.sess-new-lbl.legs{background:var(--legs)}
+.sess-date{font-size:10px;text-align:center;padding:3px 5px;border-radius:var(--radius-xs);border:1px solid var(--border);color:var(--muted);background:rgba(255,255,255,0.03);cursor:pointer;font-family:var(--mono)}
+.sess-date.has{color:var(--text);border-color:rgba(255,255,255,0.15);background:rgba(255,255,255,0.07)}
+.sess-val{font-size:11px;font-weight:500;text-align:center;padding:5px 4px;border-radius:var(--radius-xs);border:1px solid var(--border);min-height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1.3;color:var(--text);background:rgba(255,255,255,0.03);font-family:var(--mono);white-space:pre-line}
+.sess-val.has{border-color:rgba(255,255,255,0.15);background:rgba(255,255,255,0.06)}
+.sess-val.add{color:var(--muted);font-size:22px;font-weight:300;border-style:dashed}
+.sess-val.add:active{background:rgba(255,255,255,0.1)}
+
+/* HOME PAGE */
+.home-pad{padding:12px}
+.home-greeting{font-size:22px;font-weight:600;letter-spacing:-0.5px;margin-bottom:4px}
+.home-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px}
+.stat-lbl{font-size:11px;color:var(--muted);margin-bottom:4px}
+.stat-val{font-size:20px;font-weight:600;color:var(--text);font-family:var(--mono)}
+.stat-unit{font-size:12px;font-weight:400;color:var(--muted)}
+.last-section{margin-bottom:16px}
+.last-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.last-row{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
+.last-row:last-child{border-bottom:none}
+.last-row:active{background:rgba(255,255,255,0.04)}
+.last-day{display:flex;align-items:center;gap:10px}
+.day-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.day-dot.push{background:var(--push)}.day-dot.pull{background:var(--pull)}.day-dot.legs{background:var(--legs)}
+.last-name{font-size:14px;font-weight:500}
+.last-date{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.last-never{font-size:12px;color:var(--muted);font-style:italic}
+.tip-list{display:flex;flex-direction:column;gap:8px}
+.tip-card{background:var(--card);border-radius:var(--radius-sm);padding:11px 13px;border-left:3px solid;border-top:1px solid var(--border);border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.tip-card.push{border-left-color:var(--push)}.tip-card.pull{border-left-color:var(--pull)}.tip-card.legs{border-left-color:var(--legs)}
+.tip-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+.tip-label.push{color:var(--push)}.tip-label.pull{color:#85C1E9}.tip-label.legs{color:#82E0AA}
+.tip-text{font-size:12px;color:var(--muted);line-height:1.55}
+
+/* MODAL */
+.modal-wrap{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:flex-end;justify-content:center;max-width:430px;left:50%;transform:translateX(-50%);backdrop-filter:blur(4px)}
+.modal-wrap.open{display:flex}
+.modal{background:var(--card);border-radius:22px 22px 0 0;border-top:1px solid var(--border);padding:20px 20px 44px;width:100%}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:3px;color:var(--text)}
+.modal-hint{font-size:12px;color:var(--muted);margin-bottom:18px}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px}
+.field input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:16px;color:var(--text);background:rgba(255,255,255,0.05);outline:none;font-family:var(--mono);-webkit-appearance:none}
+.field input:focus{border-color:rgba(255,255,255,0.3);background:rgba(255,255,255,0.08)}
+.field-row{display:flex;gap:9px}
+.field-row .field{flex:1}
+.save-btn{width:100%;padding:14px;border-radius:var(--radius-sm);font-size:15px;font-weight:600;border:none;cursor:pointer;color:white;margin-top:4px;font-family:var(--font);letter-spacing:-0.2px;transition:opacity 0.15s}
+.save-btn:active{opacity:0.8}
+.save-btn.push{background:var(--push)}.save-btn.pull{background:var(--pull)}.save-btn.legs{background:var(--legs)}
+.cancel-btn{width:100%;padding:12px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;border:1px solid var(--border);cursor:pointer;margin-top:8px;background:transparent;color:var(--muted);font-family:var(--font)}
+.delete-btn{width:100%;padding:10px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;border:1px solid rgba(192,57,43,0.3);cursor:pointer;margin-top:6px;background:rgba(192,57,43,0.1);color:#F1948A;font-family:var(--font)}
+
+/* TOAST */
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);border-radius:20px;padding:8px 16px;font-size:13px;color:var(--text);z-index:300;opacity:0;transition:opacity 0.3s;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1}
+
+/* LOADING */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:var(--muted);font-size:13px}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--text);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* CLOUD STATUS BANNER */
+.cloud-banner{margin:0 12px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 13px;display:flex;align-items:center;gap:10px}
+.cloud-banner.error{border-color:rgba(192,57,43,0.4);background:rgba(192,57,43,0.08)}
+.cloud-banner.success{border-color:rgba(30,132,73,0.4);background:rgba(30,132,73,0.08)}
+.cloud-icon{font-size:18px;flex-shrink:0}
+.cloud-text{font-size:12px;color:var(--muted);line-height:1.4}
+.cloud-text b{color:var(--text);font-weight:500}
+.cloud-action{font-size:12px;font-weight:600;padding:5px 11px;border-radius:var(--radius-xs);border:none;cursor:pointer;font-family:var(--font);flex-shrink:0}
+.cloud-action.setup{background:var(--pull);color:white}
+.cloud-action.retry{background:rgba(255,255,255,0.08);color:var(--text);border:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="statusbar">
+  <div class="statusbar-title">PPL Tracker</div>
+  <div class="statusbar-sync" id="sync-status">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-label">Local</span>
+  </div>
+</div>
+
+<div class="main" id="main">
+
+  <!-- HOME PAGE -->
+  <div id="pg-home" class="page active">
+    <div class="home-pad">
+      <div class="home-greeting">Good session 💪</div>
+      <div class="home-sub">Track your push · pull · legs</div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-lbl">Weight</div><div class="stat-val">98 <span class="stat-unit">kg</span></div></div>
+        <div class="stat-card"><div class="stat-lbl">Body fat</div><div class="stat-val">19 <span class="stat-unit">%</span></div></div>
+        <div class="stat-card"><div class="stat-lbl">Cal target</div><div class="stat-val">2,550 <span class="stat-unit">kcal</span></div></div>
+        <div class="stat-card"><div class="stat-lbl">Protein</div><div class="stat-val">195 <span class="stat-unit">g/day</span></div></div>
+      </div>
+
+      <div class="last-section">
+        <div class="section-label" style="margin-bottom:8px">Last sessions</div>
+        <div class="last-card" id="last-sessions"></div>
+      </div>
+
+      <div class="last-section">
+        <div class="section-label" style="margin-bottom:8px">Reminders</div>
+        <div class="tip-list">
+          <div class="tip-card push"><div class="tip-label push">Push day</div><div class="tip-text">Military press: 40–45kg. Wrist neutral on incline press.</div></div>
+          <div class="tip-card pull"><div class="tip-label pull">Pull day</div><div class="tip-text">⚠️ Hammer curl: stop if left forearm flares up. See a physio.</div></div>
+          <div class="tip-card legs"><div class="tip-label legs">Legs day</div><div class="tip-text">Front squat or goblet squat first. Don't skip the 90/90 stretch.</div></div>
+        </div>
+      </div>
+
+      <div class="last-section">
+        <div class="section-label" style="margin-bottom:8px">Cloud storage</div>
+        <div id="cloud-status-area"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pg-push" class="page"></div>
+  <div id="pg-pull" class="page"></div>
+  <div id="pg-legs" class="page"></div>
+</div>
+
+<nav class="tabbar">
+  <button class="tab active" onclick="show('home')">
+    <div class="tab-icon home">🏠</div>
+    <span class="tab-lbl">Home</span>
+  </button>
+  <button class="tab" onclick="show('push')">
+    <div class="tab-icon push">PUSH</div>
+    <span class="tab-lbl">Push</span>
+  </button>
+  <button class="tab" onclick="show('pull')">
+    <div class="tab-icon pull">PULL</div>
+    <span class="tab-lbl">Pull</span>
+  </button>
+  <button class="tab" onclick="show('legs')">
+    <div class="tab-icon legs">LEGS</div>
+    <span class="tab-lbl">Legs</span>
+  </button>
+</nav>
+
+<!-- LOG MODAL -->
+<div class="modal-wrap" id="modal" onclick="overlayClose(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="m-title"></div>
+    <div class="modal-hint" id="m-hint"></div>
+    <div class="field"><label>Date</label><input type="date" id="m-date"></div>
+    <div class="field-row">
+      <div class="field"><label>Sets</label><input type="number" id="m-sets" placeholder="4" min="1" max="20"></div>
+      <div class="field"><label>Reps</label><input type="text" id="m-reps" placeholder="8"></div>
+      <div class="field"><label>Weight kg</label><input type="text" id="m-weight" placeholder="45"></div>
+    </div>
+    <button class="save-btn" id="m-save" onclick="saveLog()">Save session</button>
+    <button class="delete-btn" id="m-delete" onclick="deleteLog()" style="display:none">Delete this session</button>
+    <button class="cancel-btn" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ────────────────────────────────────────────────────
+const WORKOUTS = {
+  push:{color:'push',title:'Push day',sub:'Chest · Shoulders · Triceps',
+    warmup:['1000m row (~4:10 min)','Band pull-apart × 15','Thoracic extension on foam roller × 10','Wall shoulder slides × 10','Empty bar military press × 10'],
+    ex:[
+      {id:'p1',name:'Military Press (Barbell)',sets:'4',reps:'8',sg:'40–45kg'},
+      {id:'p2',name:'Incline DB / Barbell Press',sets:'3',reps:'10',sg:'26–28kg DB / 50–55kg bar'},
+      {id:'p3',name:'Cable Lateral Raise',sets:'3',reps:'15',sg:'8–10kg/side'},
+      {id:'p4',name:'Push-Up to Downward Dog',sets:'3',reps:'10',sg:'Bodyweight'},
+      {id:'p5',name:'Tricep Rope Pushdown',sets:'3',reps:'12',sg:'22–25kg'},
+      {id:'p6',name:'Thoracic Rotation Stretch',sets:'2',reps:'8/side',sg:'—',mob:true},
+    ]},
+  pull:{color:'pull',title:'Pull day',sub:'Back · Biceps · Rear Delts',
+    warmup:['1000m row (~4:10 min)','Dead hang 20–30 sec','Scapular pull-ups × 10','Band pull-apart × 15','Cat-cow × 10'],
+    ex:[
+      {id:'pl1',name:'Dead Hang + Scapular Pull-up',sets:'3',reps:'8',sg:'Bodyweight'},
+      {id:'pl2',name:'Barbell / DB Row',sets:'4',reps:'8',sg:'70–80kg bar / 36–40kg DB'},
+      {id:'pl3',name:'Lat Pulldown',sets:'3',reps:'10',sg:'70–80kg'},
+      {id:'pl4',name:'Face Pull',sets:'3',reps:'15',sg:'15–20kg'},
+      {id:'pl5',name:'Hammer Curl ⚠️',sets:'3',reps:'12',sg:'18–22kg DB'},
+      {id:'pl6',name:'Cat-Cow + Thread the Needle',sets:'2',reps:'8',sg:'—',mob:true},
+    ]},
+  legs:{color:'legs',title:'Legs day',sub:'Quads · Hamstrings · Glutes · Calves',
+    warmup:['6 min bike','Leg swings × 10 each direction','Bodyweight squat × 15','Hip flexor lunge × 8/side','Glute bridge × 15'],
+    ex:[
+      {id:'l1',name:'Front Squat / Goblet Squat',sets:'3–4',reps:'8–10',sg:'65–70kg / 32–40kg KB'},
+      {id:'l2',name:'Romanian Deadlift (RDL)',sets:'3',reps:'8',sg:'85–90kg'},
+      {id:'l3',name:'Bulgarian Split Squat',sets:'3',reps:'8/leg',sg:'18–20kg DB'},
+      {id:'l4',name:'Lateral Band Walk',sets:'3',reps:'12–15/dir',sg:'Med-heavy band'},
+      {id:'l5',name:'Single-Leg Calf Raise',sets:'3',reps:'15/leg',sg:'BW + 10kg DB'},
+      {id:'l6',name:"90/90 Hip + World's Greatest",sets:'2',reps:'8/side',sg:'—',mob:true},
+    ]}
+};
+
+// ── STORAGE ─────────────────────────────────────────────────
+const GDRIVE_FILE_NAME = 'ppl_tracker_data.json';
+let logs = {};
+let gdriveFileId = null;
+let cloudMode = false;
+let saveTimer = null;
+
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+
+function loadLocal(){
+  logs = lsGet('ppl_logs_v3') || {};
+  gdriveFileId = lsGet('ppl_gdrive_id') || null;
+}
+
+function saveLocal(){
+  lsSet('ppl_logs_v3', logs);
+}
+
+// ── GOOGLE DRIVE VIA ANTHROPIC API ──────────────────────────
+async function callClaude(prompt, mcpServers){
+  const body = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1000,
+    messages: [{ role: 'user', content: prompt }],
+    mcp_servers: mcpServers
+  };
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error('API error ' + r.status);
+  return r.json();
+}
+
+const MCP = [{ type: 'url', url: 'https://drivemcp.googleapis.com/mcp/v1', name: 'gdrive' }];
+
+async function findOrCreateFile(){
+  setSyncStatus('saving', 'Connecting...');
+  const searchResp = await callClaude(
+    `Search Google Drive for a file named exactly "${GDRIVE_FILE_NAME}". Return ONLY a JSON object: {"fileId": "...", "found": true} if found, or {"found": false} if not. No other text.`,
+    MCP
+  );
+  const searchText = searchResp.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+  let searchData;
+  try { searchData = JSON.parse(searchText.replace(/```json|```/g,'').trim()); } catch(e) { searchData = {found:false}; }
+
+  if(searchData.found && searchData.fileId){
+    gdriveFileId = searchData.fileId;
+    lsSet('ppl_gdrive_id', gdriveFileId);
+    return gdriveFileId;
+  }
+
+  // Create new file
+  const createResp = await callClaude(
+    `Create a new file in Google Drive named "${GDRIVE_FILE_NAME}" with the content: ${JSON.stringify({logs:{},version:1})}. Return ONLY a JSON object: {"fileId": "..."} with the new file's ID.`,
+    MCP
+  );
+  const createText = createResp.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+  let createData;
+  try { createData = JSON.parse(createText.replace(/```json|```/g,'').trim()); } catch(e) { createData = {}; }
+  if(createData.fileId){
+    gdriveFileId = createData.fileId;
+    lsSet('ppl_gdrive_id', gdriveFileId);
+    return gdriveFileId;
+  }
+  throw new Error('Could not create file');
+}
+
+async function loadFromDrive(){
+  setSyncStatus('saving', 'Loading...');
+  try {
+    const fileId = gdriveFileId || await findOrCreateFile();
+    const readResp = await callClaude(
+      `Read the contents of Google Drive file with ID "${fileId}". Return ONLY the raw JSON content of the file, nothing else.`,
+      MCP
+    );
+    const text = readResp.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    let data;
+    try { data = JSON.parse(text.replace(/```json|```/g,'').trim()); } catch(e) { data = {logs:{}}; }
+    logs = data.logs || {};
+    saveLocal();
+    cloudMode = true;
+    setSyncStatus('ok', 'Drive synced');
+    updateCloudBanner('connected');
+    buildHome();
+    ['push','pull','legs'].forEach(k => {
+      if(document.getElementById('pg-'+k).classList.contains('active')) buildDay(k);
+    });
+    showToast('Loaded from Google Drive ✓');
+  } catch(e) {
+    setSyncStatus('error', 'Drive error');
+    updateCloudBanner('error');
+    showToast('Could not connect to Drive');
+  }
+}
+
+async function saveToDrive(){
+  if(!cloudMode) return;
+  setSyncStatus('saving', 'Saving...');
+  try {
+    const fileId = gdriveFileId || await findOrCreateFile();
+    const content = JSON.stringify({logs, version:1, updated: new Date().toISOString()});
+    await callClaude(
+      `Update the Google Drive file with ID "${fileId}" and replace its entire content with this exact JSON: ${content}. Confirm with just {"ok":true}.`,
+      MCP
+    );
+    setSyncStatus('ok', 'Drive synced');
+  } catch(e) {
+    setSyncStatus('error', 'Sync failed');
+    showToast('Could not save to Drive — saved locally');
+  }
+}
+
+function scheduleSave(){
+  saveLocal();
+  if(!cloudMode) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToDrive, 2000);
+}
+
+function setSyncStatus(state, label){
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = 'sync-dot' + (state !== 'ok' ? ' ' + state : '');
+  lbl.textContent = label;
+}
+
+function updateCloudBanner(state){
+  const area = document.getElementById('cloud-status-area');
+  if(state === 'connected'){
+    area.innerHTML = `<div class="cloud-banner success"><div class="cloud-icon">☁️</div><div class="cloud-text"><b>Connected to Google Drive</b><br>Your workouts save automatically</div></div>`;
+  } else if(state === 'error'){
+    area.innerHTML = `<div class="cloud-banner error"><div class="cloud-icon">⚠️</div><div class="cloud-text" style="flex:1"><b>Drive not connected</b><br>Saving locally only</div><button class="cloud-action retry" onclick="loadFromDrive()">Retry</button></div>`;
+  } else {
+    area.innerHTML = `<div class="cloud-banner"><div class="cloud-icon">☁️</div><div class="cloud-text" style="flex:1"><b>Connect Google Drive</b><br>Save workouts to the cloud</div><button class="cloud-action setup" onclick="loadFromDrive()">Connect</button></div>`;
+  }
+}
+
+// ── UI HELPERS ───────────────────────────────────────────────
+function today(){ return new Date().toISOString().split('T')[0]; }
+function fmt(d){ if(!d) return ''; const p=d.split('-'); return p[2]+'/'+p[1]; }
+function getLogs(id){ return logs[id]||[]; }
+
+function showToast(msg, dur=2500){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+function show(key){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pg-'+key).classList.add('active');
+  document.querySelectorAll('.tab')[['home','push','pull','legs'].indexOf(key)].classList.add('active');
+  document.getElementById('main').scrollTop = 0;
+  if(key !== 'home') buildDay(key);
+  else buildHome();
+}
+
+// ── BUILD UI ─────────────────────────────────────────────────
+function buildDay(key){
+  const day = WORKOUTS[key];
+  const pg = document.getElementById('pg-'+key);
+  const wu = day.warmup.map(s=>`<div class="warmup-step">${s}</div>`).join('');
+  const exs = day.ex.map(ex => {
+    const el = getLogs(ex.id), last5 = el.slice(-5);
+    if(ex.mob) return `
+      <div class="ex-card mob">
+        <div class="ex-top"><div class="ex-name">🧘 ${ex.name}</div><div class="ex-badge mob">Mobility</div></div>
+        <div class="ex-meta"><div class="meta-tag">${ex.sets} × ${ex.reps}</div></div>
+      </div>`;
+
+    let cols = '';
+    for(let i=0;i<5;i++){
+      const lg = last5[i];
+      if(lg){
+        const lbl = (lg.sets&&lg.reps&&lg.weight) ? `${lg.sets}×${lg.reps}\n${lg.weight}kg` : '—';
+        const gi = el.indexOf(lg);
+        cols += `<div class="sess-col">
+          <div class="sess-date has">${fmt(lg.date)}</div>
+          <div class="sess-val has" onclick="editLog('${ex.id}',${gi})">${lbl}</div>
+        </div>`;
+      } else {
+        cols += `<div class="sess-col"><div class="sess-date">—</div><div class="sess-val" style="border:none;background:none"></div></div>`;
+      }
+    }
+    cols += `<div class="sess-col">
+      <div class="sess-new-lbl ${day.color}">NEW</div>
+      <div class="sess-date has">${fmt(today())}</div>
+      <div class="sess-val add" onclick="newLog('${ex.id}','${ex.name.replace(/'/g,"\\'")}','${day.color}','${ex.sg.replace(/'/g,"\\'").replace(/\n/g,' ')}')">+</div>
+    </div>`;
+
+    return `<div class="ex-card">
+      <div class="ex-top"><div class="ex-name">${ex.name}</div><div class="ex-badge ${day.color}">${ex.sets}×${ex.reps}</div></div>
+      <div class="ex-meta"><div class="meta-tag">Target: <b>${ex.sets} × ${ex.reps}</b></div><div class="meta-tag">Guide: <b>${ex.sg}</b></div></div>
+      <div class="log-lbl">Last 5 sessions — swipe → tap + to log</div>
+      <div class="log-scroll"><div class="sessions">${cols}</div></div>
+    </div>`;
+  }).join('');
+
+  pg.innerHTML = `
+    <div class="day-header ${day.color}"><h2>${day.title}</h2><p>${day.sub}</p></div>
+    <div class="warmup"><div class="section-label">Warm-up</div>${wu}</div>
+    ${exs}`;
+}
+
+function buildHome(){
+  const el = document.getElementById('last-sessions');
+  el.innerHTML = ['push','pull','legs'].map(k => {
+    const day = WORKOUTS[k]; let ld = null;
+    day.ex.forEach(ex => { const lg=getLogs(ex.id); if(lg.length){ const d=lg[lg.length-1].date; if(!ld||d>ld)ld=d; } });
+    return `<div class="last-row" onclick="show('${k}')">
+      <div class="last-day"><div class="day-dot ${k}"></div><div class="last-name">${day.title}</div></div>
+      ${ld ? `<div class="last-date">${fmt(ld)}</div>` : `<div class="last-never">Not logged yet</div>`}
+    </div>`;
+  }).join('');
+}
+
+// ── MODAL ────────────────────────────────────────────────────
+let activeModal = null;
+
+function newLog(id, name, color, sg){
+  activeModal = {id, mode:'new', color};
+  document.getElementById('m-title').textContent = name;
+  document.getElementById('m-hint').textContent = 'Suggested: ' + sg;
+  document.getElementById('m-date').value = today();
+  document.getElementById('m-sets').value = '';
+  document.getElementById('m-reps').value = '';
+  document.getElementById('m-weight').value = '';
+  document.getElementById('m-save').className = 'save-btn ' + color;
+  document.getElementById('m-delete').style.display = 'none';
+  document.getElementById('modal').classList.add('open');
+  setTimeout(()=>document.getElementById('m-sets').focus(), 300);
+}
+
+function editLog(id, idx){
+  const lg = logs[id][idx];
+  const dayKey = Object.keys(WORKOUTS).find(k=>WORKOUTS[k].ex.some(e=>e.id===id));
+  const ex = WORKOUTS[dayKey].ex.find(e=>e.id===id);
+  activeModal = {id, mode:'edit', idx, color:WORKOUTS[dayKey].color};
+  document.getElementById('m-title').textContent = ex.name;
+  document.getElementById('m-hint').textContent = 'Editing · ' + fmt(lg.date);
+  document.getElementById('m-date').value = lg.date||today();
+  document.getElementById('m-sets').value = lg.sets||'';
+  document.getElementById('m-reps').value = lg.reps||'';
+  document.getElementById('m-weight').value = lg.weight||'';
+  document.getElementById('m-save').className = 'save-btn ' + activeModal.color;
+  document.getElementById('m-delete').style.display = 'block';
+  document.getElementById('modal').classList.add('open');
+}
+
+function saveLog(){
+  if(!activeModal) return;
+  const entry = {
+    date: document.getElementById('m-date').value || today(),
+    sets: document.getElementById('m-sets').value,
+    reps: document.getElementById('m-reps').value,
+    weight: document.getElementById('m-weight').value
+  };
+  if(!logs[activeModal.id]) logs[activeModal.id] = [];
+  if(activeModal.mode==='edit') logs[activeModal.id][activeModal.idx] = entry;
+  else logs[activeModal.id].push(entry);
+  scheduleSave();
+  closeModal();
+  const dayKey = Object.keys(WORKOUTS).find(k=>WORKOUTS[k].ex.some(e=>e.id===activeModal.id));
+  if(dayKey) buildDay(dayKey);
+  buildHome();
+  showToast(cloudMode ? 'Saved · syncing to Drive...' : 'Saved locally');
+}
+
+function deleteLog(){
+  if(!activeModal||activeModal.mode!=='edit') return;
+  logs[activeModal.id].splice(activeModal.idx, 1);
+  scheduleSave();
+  closeModal();
+  const dayKey = Object.keys(WORKOUTS).find(k=>WORKOUTS[k].ex.some(e=>e.id===activeModal.id));
+  if(dayKey) buildDay(dayKey);
+  buildHome();
+  showToast('Session deleted');
+}
+
+function closeModal(){ document.getElementById('modal').classList.remove('open'); activeModal=null; }
+function overlayClose(e){ if(e.target===document.getElementById('modal')) closeModal(); }
+
+// ── INIT ─────────────────────────────────────────────────────
+loadLocal();
+buildHome();
+updateCloudBanner('disconnected');
+
+// Auto-connect if we have a saved file ID
+if(gdriveFileId){
+  loadFromDrive();
+} else {
+  setSyncStatus('ok', 'Local only');
+}
+</script>
+</body>
+</html>
